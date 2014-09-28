@@ -2,7 +2,7 @@
  * BootstrapValidator (http://bootstrapvalidator.com)
  * The best jQuery plugin to validate form fields. Designed to use with Bootstrap 3
  *
- * @version     v0.5.2, built on 2014-09-25 4:01:07 PM
+ * @version     v0.5.3-dev, built on 2014-10-06 8:02:42 AM
  * @author      https://twitter.com/nghuuphuoc
  * @copyright   (c) 2013 - 2014 Nguyen Huu Phuoc
  * @license     MIT
@@ -2457,13 +2457,18 @@ if (typeof jQuery === 'undefined') {
 }(window.jQuery));
 ;(function($) {
     $.fn.bootstrapValidator.i18n.date = $.extend($.fn.bootstrapValidator.i18n.date || {}, {
-        'default': 'Please enter a valid date'
+        'default': 'Please enter a valid date',
+        min: 'Please enter a date after %s',
+        max: 'Please enter a date before %s',
+        range: 'Please enter a date in the range %s - %s'
     });
 
     $.fn.bootstrapValidator.validators.date = {
         html5Attributes: {
             message: 'message',
             format: 'format',
+            min: 'min',
+            max: 'max',
             separator: 'separator'
         },
 
@@ -2474,6 +2479,8 @@ if (typeof jQuery === 'undefined') {
          * @param {jQuery} $field Field element
          * @param {Object} options Can consist of the following keys:
          * - message: The invalid message
+         * - min: the minimum date
+         * - max: the maximum date
          * - separator: Use to separate the date, month, and year.
          * By default, it is /
          * - format: The date format. Default is MM/DD/YYYY
@@ -2483,7 +2490,7 @@ if (typeof jQuery === 'undefined') {
          * ii) date and time:
          * The time can consist of h, m, s parts which are separated by :
          * ii) date, time and A (indicating AM or PM)
-         * @returns {Boolean}
+         * @returns {Boolean|Object}
          */
         validate: function(validator, $field, options) {
             var value = $field.val();
@@ -2507,7 +2514,10 @@ if (typeof jQuery === 'undefined') {
                 time       = (sections.length > 1) ? sections[1] : null;
 
             if (formats.length !== sections.length) {
-                return false;
+                return {
+                    valid: false,
+                    message: options.message || $.fn.bootstrapValidator.i18n.date['default']
+                };
             }
 
             // Determine the separator
@@ -2516,14 +2526,20 @@ if (typeof jQuery === 'undefined') {
                 separator = (date.indexOf('/') !== -1) ? '/' : ((date.indexOf('-') !== -1) ? '-' : null);
             }
             if (separator === null || date.indexOf(separator) === -1) {
-                return false;
+                return {
+                    valid: false,
+                    message: options.message || $.fn.bootstrapValidator.i18n.date['default']
+                };
             }
 
             // Determine the date
             date       = date.split(separator);
             dateFormat = dateFormat.split(separator);
             if (date.length !== dateFormat.length) {
-                return false;
+                return {
+                    valid: false,
+                    message: options.message || $.fn.bootstrapValidator.i18n.date['default']
+                };
             }
 
             var year  = date[$.inArray('YYYY', dateFormat)],
@@ -2531,7 +2547,10 @@ if (typeof jQuery === 'undefined') {
                 day   = date[$.inArray('DD', dateFormat)];
 
             if (!year || !month || !day || year.length !== 4) {
-                return false;
+                return {
+                    valid: false,
+                    message: options.message || $.fn.bootstrapValidator.i18n.date['default']
+                };
             }
 
             // Determine the time
@@ -2541,7 +2560,10 @@ if (typeof jQuery === 'undefined') {
                 time       = time.split(':');
 
                 if (timeFormat.length !== time.length) {
-                    return false;
+                    return {
+                        valid: false,
+                        message: options.message || $.fn.bootstrapValidator.i18n.date['default']
+                    };
                 }
 
                 hours   = time.length > 0 ? time[0] : null;
@@ -2551,39 +2573,137 @@ if (typeof jQuery === 'undefined') {
                 // Validate seconds
                 if (seconds) {
                     if (isNaN(seconds) || seconds.length > 2) {
-                        return false;
+                        return {
+                            valid: false,
+                            message: options.message || $.fn.bootstrapValidator.i18n.date['default']
+                        };
                     }
                     seconds = parseInt(seconds, 10);
                     if (seconds < 0 || seconds > 60) {
-                        return false;
+                        return {
+                            valid: false,
+                            message: options.message || $.fn.bootstrapValidator.i18n.date['default']
+                        };
                     }
                 }
 
                 // Validate hours
                 if (hours) {
                     if (isNaN(hours) || hours.length > 2) {
-                        return false;
+                        return {
+                            valid: false,
+                            message: options.message || $.fn.bootstrapValidator.i18n.date['default']
+                        };
                     }
                     hours = parseInt(hours, 10);
                     if (hours < 0 || hours >= 24 || (amOrPm && hours > 12)) {
-                        return false;
+                        return {
+                            valid: false,
+                            message: options.message || $.fn.bootstrapValidator.i18n.date['default']
+                        };
                     }
                 }
 
                 // Validate minutes
                 if (minutes) {
                     if (isNaN(minutes) || minutes.length > 2) {
-                        return false;
+                        return {
+                            valid: false,
+                            message: options.message || $.fn.bootstrapValidator.i18n.date['default']
+                        };
                     }
                     minutes = parseInt(minutes, 10);
                     if (minutes < 0 || minutes > 59) {
-                        return false;
+                        return {
+                            valid: false,
+                            message: options.message || $.fn.bootstrapValidator.i18n.date['default']
+                        };
                     }
                 }
             }
 
             // Validate day, month, and year
-            return $.fn.bootstrapValidator.helpers.date(year, month, day);
+            var valid   = $.fn.bootstrapValidator.helpers.date(year, month, day),
+                message = options.message || $.fn.bootstrapValidator.i18n.date['default'];
+
+            // declare the date, min and max objects
+            var min       = null,
+                max       = null,
+                minOption = options.min,
+                maxOption = options.max;
+
+            if (minOption) {
+                if (isNaN(Date.parse(minOption))) {
+                    minOption = validator.getDynamicOption($field, minOption);
+                }
+                min = this._parseDate(minOption, dateFormat, separator);
+            }
+
+            if (maxOption) {
+                if (isNaN(Date.parse(maxOption))) {
+                    maxOption = validator.getDynamicOption($field, maxOption);
+                }
+                max = this._parseDate(maxOption, dateFormat, separator);
+            }
+
+            date = new Date(year, month, day, hours, minutes, seconds);
+
+            switch (true) {
+                case (minOption && !maxOption && valid):
+                    valid   = date.getTime() >= min.getTime();
+                    message = options.message || $.fn.bootstrapValidator.helpers.format($.fn.bootstrapValidator.i18n.date.min, minOption);
+                    break;
+
+                case (maxOption && !minOption && valid):
+                    valid   = date.getTime() <= max.getTime();
+                    message = options.message || $.fn.bootstrapValidator.helpers.format($.fn.bootstrapValidator.i18n.date.max, maxOption);
+                    break;
+
+                case (maxOption && minOption && valid):
+                    valid   = date.getTime() <= max.getTime() && date.getTime() >= min.getTime();
+                    message = options.message || $.fn.bootstrapValidator.helpers.format($.fn.bootstrapValidator.i18n.date.range, [minOption, maxOption]);
+                    break;
+
+                default:
+                    break;
+            }
+
+            return {
+                valid: valid,
+                message: message
+            };
+        },
+
+        /**
+         * Return a date object after parsing the date string
+         *
+         * @param {String} date   The date string to parse
+         * @param {String} format The date format
+         * The format can be:
+         *   - date: Consist of DD, MM, YYYY parts which are separated by the separator option
+         *   - date and time:
+         *     The time can consist of h, m, s parts which are separated by :
+         * @param {String} separator The separator used to separate the date, month, and year
+         * @returns {Date}
+         */
+        _parseDate: function(date, format, separator) {
+            var minutes     = 0, hours = 0, seconds = 0,
+                sections    = date.split(' '),
+                dateSection = sections[0],
+                timeSection = (sections.length > 1) ? sections[1] : null;
+
+            dateSection = dateSection.split(separator);
+            var year  = dateSection[$.inArray('YYYY', format)],
+                month = dateSection[$.inArray('MM', format)],
+                day   = dateSection[$.inArray('DD', format)];
+            if (timeSection) {
+                timeSection = timeSection.split(':');
+                hours       = timeSection.length > 0 ? timeSection[0] : null;
+                minutes     = timeSection.length > 1 ? timeSection[1] : null;
+                seconds     = timeSection.length > 2 ? timeSection[2] : null;
+            }
+
+            return new Date(year, month, day, hours, minutes, seconds);
         }
     };
 }(window.jQuery));
@@ -5936,7 +6056,8 @@ if (typeof jQuery === 'undefined') {
         html5Attributes: {
             message: 'message',
             min: 'min',
-            max: 'max'
+            max: 'max',
+            utf8bytes: 'utf8Bytes'
         },
 
         enableByHtml5: function($field) {
@@ -5969,6 +6090,7 @@ if (typeof jQuery === 'undefined') {
          *      - A callback function that returns the number
          *
          * - message: The invalid message
+         * - utf8bytes: Evaluate string length in UTF-8 bytes, default to false
          * @returns {Object}
          */
         validate: function(validator, $field, options) {
@@ -5977,11 +6099,27 @@ if (typeof jQuery === 'undefined') {
                 return true;
             }
 
-            var min     = $.isNumeric(options.min) ? options.min : validator.getDynamicOption($field, options.min),
-                max     = $.isNumeric(options.max) ? options.max : validator.getDynamicOption($field, options.max),
-                length  = value.length,
-                isValid = true,
-                message = options.message || $.fn.bootstrapValidator.i18n.stringLength['default'];
+            var min        = $.isNumeric(options.min) ? options.min : validator.getDynamicOption($field, options.min),
+                max        = $.isNumeric(options.max) ? options.max : validator.getDynamicOption($field, options.max),
+                // Credit to http://stackoverflow.com/a/23329386 (@lovasoa) for UTF-8 byte length code
+                utf8Length = function(str) {
+                                 var s = str.length;
+                                 for (var i = str.length - 1; i >= 0; i--) {
+                                     var code = str.charCodeAt(i);
+                                     if (code > 0x7f && code <= 0x7ff) {
+                                         s++;
+                                     } else if (code > 0x7ff && code <= 0xffff) {
+                                         s += 2;
+                                     }
+                                     if (code >= 0xDC00 && code <= 0xDFFF) {
+                                         i--;
+                                     }
+                                 }
+                                 return s;
+                             },
+                length     = options.utf8Bytes ? utf8Length(value) : value.length,
+                isValid    = true,
+                message    = options.message || $.fn.bootstrapValidator.i18n.stringLength['default'];
 
             if ((min && length < parseInt(min, 10)) || (max && length > parseInt(max, 10))) {
                 isValid = false;
